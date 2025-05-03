@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="bubble_size">60dp</dimen>
+    <dimen name="bubble_margin">20dp</dimen>
+</resources>
