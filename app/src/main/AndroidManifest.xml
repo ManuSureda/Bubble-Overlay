@@ -2,25 +2,53 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+<!--  permite mostrar ventanas sobre otras apps, Requiere solicitar permiso en tiempo de ejecución  -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+<!--  Necesario para ejecutar servicios en primer plano  -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+<!--  Permite capturar la pantalla en un servicio en primer plano  -->
+<!--    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />-->
+<!--  Acceso al almacenamiento externo  -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+<!--  Reemplaza a READ_EXTERNAL_STORAGE en Android 13+ para acceder solo a imágenes-->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+<!--  Al parecer por convencion estoy obligado a generar una notificacion advirtiendo del uso de la burbuja
+eso me obliga a usar startForeground, lo cual me obliga a definir el foregroundtype, lo cual me obliga
+a definir este permiso-->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
 
+    <!--Configuracion de la Aplicacion-->
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BubbleOverlay"
         tools:targetApi="31">
+<!--    allowBackup: Permite copias de seguridad automáticas en Google Drive.
+        dataExtractionRules: Define qué datos se incluyen en las copias (en res/xml/data_extraction_rules.xml).
+        fullBackupContent: Configuración detallada de backups (en res/xml/backup_rules.xml).
+        icon/label: Define el ícono y nombre de la app (usando recursos).
+        supportsRtl: Soporte para diseños Right-to-Left (ej: árabe, hebreo).
+        theme: Tema personalizado (Theme.BubbleOverlay).
+        targetApi="31": Indica que el app está diseñada para Android 12 (API 31).    -->
 
+
+<!--    Activity is a GUI and service is non-gui thread which can run in the background.
+    BubbleService no es una Activity.
+    -No es una pantalla completa
+        Las Activities representan pantallas tradicionales (con su propio diseño y ciclo de vida).
+        Las burbujas son vistas flotantes (como ventanas emergentes) que no ocupan toda la pantalla ni manejan navegación.
+    -Se dibujan sobre otras apps
+        Las burbujas usan el permiso SYSTEM_ALERT_WINDOW para mostrarse sobre cualquier otra app (incluso fuera de tu aplicación).
+        Una Activity solo se muestra dentro del contexto de tu app.
+    -No tienen ciclo de vida de Activity
+        Las burbujas son gestionadas por un Service (que mantiene su lógica en segundo plano).
+        La interacción con la burbuja no activa métodos como onCreate() o onResume() de una Activity.
+-->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -29,17 +57,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+<!--    MainActivity:
+        Actividad principal (punto de entrada).
+        exported="true": Permite que otras apps la inicien.
+        Intent Filter:
+            MAIN: Punto de entrada al app.
+            LAUNCHER: Aparece en el launcher del dispositivo. -->
 
         <activity
             android:name=".ImagePickerActivity"
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:exported="false"/>
+<!--    ImagePickerActivity:
+        Actividad secundaria para seleccionar imágenes.
+        excludeFromRecents="true": No aparece en el menú de apps recientes.
+        taskAffinity="": No pertenece a ninguna tarea específica.
+        exported="false": Solo se puede iniciar desde dentro del app.  -->
 
         <service
             android:name=".BubbleService"
-            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true"
+            android:foregroundServiceType="specialUse"
             android:permission="android.permission.FOREGROUND_SERVICE" />
+<!--    BubbleService:
+        Servicio en primer plano para mostrar contenido persistente (como burbujas).
+        foregroundServiceType: Tipo "mediaProjection" indica que captura pantalla (Android 10+).
+        stopWithTask="true": El servicio se detiene si el usuario cierra la app.
+        permission: Requiere el permiso FOREGROUND_SERVICE para iniciar el servicio.  -->
+
+        <property
+            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+            android:value="bubble_overlay" />
 
     </application>
 </manifest>

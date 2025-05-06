@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.io.File
 import java.io.FileOutputStream
 
@@ -19,7 +20,13 @@ class ImagePickerActivity : AppCompatActivity() {
                     FileOutputStream(file).use { output ->
                         inputStream?.copyTo(output)
                     }
-                    BubbleService.instance?.handleImageSelection(Uri.fromFile(file))
+
+                    // Enviar URI mediante broadcast
+                    val intent = Intent("IMAGE_SELECTED_ACTION").apply {
+                        putExtra("image_uri", Uri.fromFile(file))
+                    }
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+
                 } catch (e: Exception) {
                     Toast.makeText(this, "Error al guardar imagen", Toast.LENGTH_SHORT).show()
                 }
