@@ -1,3 +1,4 @@
+/*
 package com.alq.bubbleoverlay
 
 import android.content.Intent
@@ -43,4 +44,4 @@ class ImagePickerActivity : AppCompatActivity() {
         }
         startForResult.launch(intent)
     }
-}
+}*/

@@ -11,14 +11,17 @@ object NotificationHelper {
     private const val CHANNEL_NAME = "Burbujas Activas"
 
     fun createChannel(context: Context) {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "Controla la visualización de burbujas flotantes" }
-
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) { // <- Verificar si ya existe
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Controla la visualización de burbujas flotantes"
+            }
+            nm.createNotificationChannel(channel)
+        }
     }
 
     fun buildNotification(context: Context): Notification =

@@ -64,19 +64,19 @@ a definir este permiso-->
             MAIN: Punto de entrada al app.
             LAUNCHER: Aparece en el launcher del dispositivo. -->
 
-        <activity
-            android:name=".ImagePickerActivity"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:exported="false"/>
-<!--    ImagePickerActivity:
-        Actividad secundaria para seleccionar imágenes.
-        excludeFromRecents="true": No aparece en el menú de apps recientes.
-        taskAffinity="": No pertenece a ninguna tarea específica.
-        exported="false": Solo se puede iniciar desde dentro del app.  -->
+        <!--       <activity
+                   android:name=".ImagePickerActivity"
+                   android:excludeFromRecents="true"
+                   android:taskAffinity=""
+                   android:exported="false"/>
+           ImagePickerActivity:
+               Actividad secundaria para seleccionar imágenes.
+               excludeFromRecents="true": No aparece en el menú de apps recientes.
+               taskAffinity="": No pertenece a ninguna tarea específica.
+               exported="false": Solo se puede iniciar desde dentro del app.  -->
 
         <service
-            android:name=".BubbleService"
+            android:name=".service.BubbleService"
             android:stopWithTask="true"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.FOREGROUND_SERVICE" />

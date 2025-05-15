@@ -1,18 +1,21 @@
-package com.alq.bubbleoverlay.ui
+package com.alq.bubbleoverlay.ui.listeners
 
 import android.content.Context
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import com.alq.bubbleoverlay.data.Bubble
+import com.alq.bubbleoverlay.dao.Bubble
 
+/**
+ * Escucha gestos (arrastre y doble-tap) sobre una burbuja y delega acciones al Service.
+ */
 class BubbleTouchListener(
     private val context: Context,
     private val bubble: Bubble,
     private val windowManager: WindowManager,
     private val onBubbleSelected: (Bubble) -> Unit,
-    private val togglePanel: () -> Unit
+    private val onBubbleDoubleTap: (Bubble) -> Unit
 ) : View.OnTouchListener {
     /**
      * Unit = void en java
@@ -26,8 +29,8 @@ class BubbleTouchListener(
      *      Añadir vistas flotantes encima de otras apps (con permisos de overlay).
      *      Actualizar posición/tamaño de esas vistas.
      *      Eliminar vistas cuando ya no las necesitas.
-     */
-    /**
+     *
+     *      --------------------------------
      * aca vamos a escuchar los eventos que ocurren en una determinada burbuja.
      * definimos en el constructor los metodos de "respuesta", pero solo definimos la firma: como lambdas onBubbleSelected: (Bubble) -> Unit
      * y posteriormente definimos ante que evento disparar dicho metodo de respuesta: onDoubleTap -> togglePanel
@@ -54,6 +57,7 @@ class BubbleTouchListener(
      * gestureDetector es el motor que traduce eventos crudos en gestos y despacha esas llamadas al listener.
      */
 
+    // DisplayMetrics y margen para límites de arrastre
     private val dm = context.resources.displayMetrics
     private val margin = 20
 
@@ -76,23 +80,23 @@ class BubbleTouchListener(
             // distanceX es cuánto se movió el dedo en X desde el último evento
 
             // Recalculo cada vez los límites según el tamaño actual de la vista
-            val maxX = dm.widthPixels  - bubble.view.width  - margin
-            val maxY = dm.heightPixels - bubble.view.height - margin
+            val maxX = dm.widthPixels  - bubble.view!!.width  - margin
+            val maxY = dm.heightPixels - bubble.view!!.height - margin
 
-            val newX = (e2.rawX - bubble.view.width  / 2)
+            val newX = (e2.rawX - bubble.view!!.width  / 2)
                 .coerceIn(margin.toFloat(), maxX.toFloat()).toInt()
-            val newY = (e2.rawY - bubble.view.height / 2)
+            val newY = (e2.rawY - bubble.view!!.height / 2)
                 .coerceIn(margin.toFloat(), maxY.toFloat()).toInt()
 
-            bubble.params.x = newX
-            bubble.params.y = newY
+            bubble.params!!.x = newX
+            bubble.params!!.y = newY
             windowManager.updateViewLayout(bubble.view, bubble.params)
 
             return true
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            togglePanel()
+            onBubbleDoubleTap(bubble)
             return true
         }
     }

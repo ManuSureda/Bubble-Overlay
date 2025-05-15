@@ -33,7 +33,9 @@
             android:textSize="18sp"
             android:textColor="#212121"
             android:gravity="center"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"/>
 
         <LinearLayout
             android:layout_width="match_parent"

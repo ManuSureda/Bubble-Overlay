@@ -7,9 +7,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.alq.bubbleoverlay.service.BubbleService
 
 // ":" es como decir 'extends' en java
 // AppCompatActivity : Proporciona compatibilidad con características modernas de Android en versiones antiguas.
@@ -91,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         if (!isMyServiceRunning(BubbleService::class.java)) {
             val intent = Intent(this, BubbleService::class.java)
 
+            Log.e("MainActivity", "--startBubbleService()--")
             // Iniciar como Foreground Service en Android 8.0+ (Oreo)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)

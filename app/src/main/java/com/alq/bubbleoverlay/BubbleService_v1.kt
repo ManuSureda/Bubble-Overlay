@@ -1,5 +1,5 @@
-package com.alq.bubbleoverlay
 
+package com.alq.bubbleoverlay
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -33,7 +33,7 @@ data class Bubble(
 )
 
 // Servicio principal que gestiona las burbujas
-class BubbleService : Service() {
+class BubbleService_v1 : Service() {
     // Lista de burbujas activas
     private val bubbles = mutableListOf<Bubble>()
     // Burbuja seleccionada actualmente
@@ -267,24 +267,6 @@ class BubbleService : Service() {
             }
         }
     }
-
-    /*private fun getNavigationBarHeight(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Método moderno para Android 11+ (API 30)
-            val windowMetrics = windowManager.currentWindowMetrics
-            val insets = windowMetrics.windowInsets.getInsetsIgnoringVisibility(
-                WindowInsets.Type.navigationBars()
-            )
-            insets.bottom
-        } else {
-            // Método alternativo para versiones anteriores usando recursos del sistema
-            try {
-                resources.getDimensionPixelSize(android.R.dimen.navigation_bar_height)
-            } catch (e: Exception) {
-                0 // Fallback seguro
-            }
-        }
-    }*/
 
     // Muestra u oculta el panel de control
     private fun togglePanel() {
