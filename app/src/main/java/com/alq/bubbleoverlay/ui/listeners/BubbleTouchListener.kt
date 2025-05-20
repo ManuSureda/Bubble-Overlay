@@ -5,14 +5,16 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import com.alq.bubbleoverlay.dao.Bubble
+import com.alq.bubbleoverlay.ui.views.BubbleView
 
 /**
  * Escucha gestos (arrastre y doble-tap) sobre una burbuja y delega acciones al Service.
  */
 class BubbleTouchListener(
     private val context: Context,
-    private val bubble: Bubble,
+    private val bubbleView: BubbleView,
     private val windowManager: WindowManager,
     private val onBubbleSelected: (Bubble) -> Unit,
     private val onBubbleDoubleTap: (Bubble) -> Unit
@@ -79,24 +81,33 @@ class BubbleTouchListener(
         ): Boolean {
             // distanceX es cuánto se movió el dedo en X desde el último evento
 
-            // Recalculo cada vez los límites según el tamaño actual de la vista
-            val maxX = dm.widthPixels  - bubble.view!!.width  - margin
-            val maxY = dm.heightPixels - bubble.view!!.height - margin
+            val params = bubbleView.getParams()?: run {
+                Toast.makeText(context, "Error al crear el listener de la burbuja", Toast.LENGTH_SHORT).show()
+                return false
+            }
+            val view = bubbleView.getView()?: run {
+                Toast.makeText(context, "Error al crear el listener de la burbuja", Toast.LENGTH_SHORT).show()
+                return false
+            }
 
-            val newX = (e2.rawX - bubble.view!!.width  / 2)
+            // Recalculo cada vez los límites según el tamaño actual de la vista
+            val maxX = dm.widthPixels  - view.width  - margin
+            val maxY = dm.heightPixels - view.height - margin
+
+            val newX = (e2.rawX - view.width  / 2)
                 .coerceIn(margin.toFloat(), maxX.toFloat()).toInt()
-            val newY = (e2.rawY - bubble.view!!.height / 2)
+            val newY = (e2.rawY - view.height / 2)
                 .coerceIn(margin.toFloat(), maxY.toFloat()).toInt()
 
-            bubble.params!!.x = newX
-            bubble.params!!.y = newY
-            windowManager.updateViewLayout(bubble.view, bubble.params)
+            params.x = newX
+            params.y = newY
+            windowManager.updateViewLayout(view, params)
 
             return true
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            onBubbleDoubleTap(bubble)
+            onBubbleDoubleTap(bubbleView.getBubble())
             return true
         }
     }
@@ -111,7 +122,7 @@ class BubbleTouchListener(
         // onTouchEvent envía cada MotionEvent al detector, que internamente decide cuándo llamar a tu gestureListener.onScroll u onDoubleTap.
         gestureDetector.onTouchEvent(event)
 
-        onBubbleSelected(bubble)
+        onBubbleSelected(bubbleView.getBubble())
         /*
         * podrias hacer if (event.action == MotionEvent.ACTION_DOWN) { onBubbleSelected(bubble) }
         * pero siempre (tanto double tap como on scroll empiezan con un ACTION_DOWN supongo

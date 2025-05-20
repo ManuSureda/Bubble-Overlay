@@ -74,6 +74,12 @@ a definir este permiso-->
                excludeFromRecents="true": No aparece en el menú de apps recientes.
                taskAffinity="": No pertenece a ninguna tarea específica.
                exported="false": Solo se puede iniciar desde dentro del app.  -->
+<!--actividad secundaria para manejar la seleccion de imagenes-->
+        <activity
+            android:name=".service.ImageResultHandlerActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true"/>
+
 
         <service
             android:name=".service.BubbleService"

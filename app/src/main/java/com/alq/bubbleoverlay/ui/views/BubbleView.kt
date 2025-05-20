@@ -9,8 +9,10 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.SeekBar
+import android.widget.Toast
 import com.alq.bubbleoverlay.R
 import com.alq.bubbleoverlay.dao.Bubble
+import com.alq.bubbleoverlay.dao.BubbleShape
 import com.alq.bubbleoverlay.ui.listeners.BubbleTouchListener
 import com.alq.bubbleoverlay.utils.dpToPx
 import com.google.android.material.card.MaterialCardView
@@ -21,9 +23,13 @@ class BubbleView (
     private val bubble: Bubble,
     private val onBubbleSelected: (bubbleId: Long) -> Unit,
     private val onBubbleDoubleTap: (bubbleId: Long) -> Unit
-){
+) {
     private var view: View? = null                         // Vista de la burbuja
     private var params: WindowManager.LayoutParams? = null // Parámetros de posición/tamaño
+
+    fun getView(): View? { return view }
+    fun getParams(): WindowManager.LayoutParams? { return params }
+    fun getBubble(): Bubble { return bubble }
 
     fun getBubbleId(): Long {
         return bubble.id
@@ -39,7 +45,7 @@ class BubbleView (
         view!!.findViewById<ImageView>(R.id.bubble_icon).setImageURI(bubble.imageUri)
 
         val cardView = view!!.findViewById<MaterialCardView>(R.id.bubble_root)
-        cardView.radius = if (bubble.isCircle) cardView.width / 2f else 0f
+        cardView.radius = if (bubble.shape == BubbleShape.CIRCLE) cardView.width / 2f else 0f
 
         windowManager.updateViewLayout(view, params)
 
@@ -49,7 +55,7 @@ class BubbleView (
         // Configura eventos táctiles
         val touchListener = BubbleTouchListener(
             context           = context,
-            bubble            = bubble,
+            bubbleView        = this,
             windowManager     = windowManager,
             onBubbleSelected  = { b ->
                 onBubbleSelected(b.id)
@@ -78,9 +84,22 @@ class BubbleView (
         }
     }
 
+    fun centerView(panelHeight: Int) {
+        val displayMetrics = context.resources.displayMetrics
+
+        // Centrado horizontal
+        val screenCenterX = displayMetrics.widthPixels / 2
+        val bubbleHalfWidth = view!!.width / 2
+        params!!.x = screenCenterX - bubbleHalfWidth
+
+        // Posición vertical debajo del panel
+        params!!.y = panelHeight + 40.dpToPx(context)
+        windowManager.updateViewLayout(view, params)
+    }
+
     fun changeShape() {
         val cardView = view!!.findViewById<MaterialCardView>(R.id.bubble_root)
-        cardView.radius = if (bubble.isCircle) cardView.width / 2f else 0f
+        cardView.radius = if (bubble.shape == BubbleShape.CIRCLE) cardView.width / 2f else 0f
 
         windowManager.updateViewLayout(view, params)
     }
@@ -98,5 +117,19 @@ class BubbleView (
             layoutParams.width = sizeInPx
             layoutParams.height = sizeInPx
         }
+    }
+
+    fun updateImage() {
+        try {
+            view!!.findViewById<ImageView>(R.id.bubble_icon)
+                .setImageURI(bubble.imageUri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Error al cargar imagen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun cleanUp() {
+        // 1. Remover vistas del WindowManager
+        windowManager.removeView(view)  // Reemplaza yourRootView con la vista principal
     }
 }

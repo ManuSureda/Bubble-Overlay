@@ -1,6 +1,6 @@
-/*
-package com.alq.bubbleoverlay
 
+package com.alq.bubbleoverlay
+/*
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle

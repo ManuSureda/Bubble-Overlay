@@ -13,6 +13,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.alq.bubbleoverlay.R
 import com.alq.bubbleoverlay.dao.Bubble
 import com.alq.bubbleoverlay.dao.BubbleDatabase
+import com.alq.bubbleoverlay.dao.BubbleShape
 import com.alq.bubbleoverlay.ui.views.BubbleControlPanelView
 import com.alq.bubbleoverlay.ui.views.BubbleView
 import kotlinx.coroutines.CoroutineScope
@@ -28,10 +29,12 @@ import kotlinx.coroutines.withContext
 class BubbleService : Service() {
     private val NOTIFICATION_ID = 1001
 
-    private lateinit var bubbleDao: BubbleDao
+    // val = variable de solo lectura (inmutable)
     private val coroutineScope = CoroutineScope(Dispatchers.Main + Job()) // Alcance de corrutinas
 
-    // val = variable de solo lectura (inmutable)
+    // debo inizializarlo despues, por que necesita el contexto que se crea tras el onCreate...
+    private lateinit var bubbleDao: BubbleDao
+
     // lista de burbujas activas
     private var bubblesList = mutableListOf<Bubble>()
     // burbuja seleccionada actualmente
@@ -46,7 +49,7 @@ class BubbleService : Service() {
     // todo: al parecer, no es correcto tener views dentro de un service por posibles memoryleak
     // todo: corregir!!!
     //private lateinit var bubbleView: BubbleView
-    private lateinit var bubbleViewList: MutableList<BubbleView>
+    private var bubbleViewList = mutableListOf<BubbleView>()
     private lateinit var bubbleControlPanelView: BubbleControlPanelView
 
 
@@ -85,20 +88,31 @@ class BubbleService : Service() {
         initializeWindowManager()
         initializeLocalBroadcastManager()
 
-        // Configura la notificación permanente (requerido para servicios en primer plano)
-        setupNotification()
-
         // Inicializar Room
         val database = BubbleDatabase.getInstance(this)
         bubbleDao = database.bubbleDao()
 
-        // Cargar burbujas al iniciar el servicio
-        // tambien hace el setup de burbuja
-        loadBubbles() // si no habia ninguna burbuja, crea una
+        // Configura la notificación permanente (requerido para servicios en primer plano)
+        setupNotification()
 
-        if (activeBubble == null) {  activeBubble = bubblesList[0] }
 
-        setupBubbleControlPanel()
+        coroutineScope.launch {
+            // Cargar burbujas registradas en la BD
+            bubblesList = loadBubbles()
+
+            if (bubblesList.isEmpty()) { // si no habia ninguna burbuja, crea una
+                createNewBubble()
+            }
+
+            activeBubble = bubblesList[0]
+
+            withContext(Dispatchers.Main) {
+                // infla el layout y genera el BubbleView
+                bubblesList.forEach { bubble -> setupBubble(bubble) }
+
+                setupBubbleControlPanel()
+            }
+        }
     }
 
     private fun initializeWindowManager() {
@@ -117,28 +131,18 @@ class BubbleService : Service() {
         startForeground(NOTIFICATION_ID, notification)
     }
 
-    private fun loadBubbles() {
-
-//        coroutineScope.launch(Dispatchers.IO) { // Ejecutar en hilo de fondo
-//            ... bubbles.forEach { bubble -> setupBubble(bubble) } // aca hay UI
-//            ... Toast.makeText(this@BubbleService, "Error car.... // aca tambien
-//        } esto genera un error, ya que Android demanda que lo  lo UI se haga en el main thread y no en uno I/O
-
-        coroutineScope.launch { // por defecto Dispatchers.Main
-            try {
-                // 1) Lee la BD en IO
-                val bubbles = withContext(Dispatchers.IO) {
-                    bubbleDao.getAllBubbles().toMutableList()
-                }
-
-                // 2) Ya en Main, configura vistas y posibles Toasts
-                bubbles.forEach { bubble -> setupBubble(bubble) }
-                if (bubbles.isEmpty()) createNewBubble()
-
-            } catch (e: Exception) {
-                Log.e("BubbleService", "Error cargando burbujas", e)
+    private suspend fun loadBubbles(): MutableList<Bubble> {
+        return try {
+            // Este bloque BLOCKEA solo la corrutina hasta que termine la lectura
+            withContext(Dispatchers.IO) {
+                bubbleDao.getAllBubbles().toMutableList()
+            }
+        } catch (e: Exception) {
+            Log.e("BubbleService", "Error cargando burbujas", e)
+            withContext(Dispatchers.Main) {
                 Toast.makeText(this@BubbleService, "Error cargando burbujas", Toast.LENGTH_SHORT).show()
             }
+            mutableListOf()
         }
     }
 
@@ -147,19 +151,35 @@ class BubbleService : Service() {
         return Uri.parse("android.resource://${context.packageName}/$resourceId")
     }
 
-    private fun createNewBubble() {
+    private suspend fun createNewBubble() {
         val uri = getDefaultImageUri(this)
-        val bubble = Bubble (
+        val bubble = Bubble(
             title = "Burbuja Nueva",
             imageUri = uri
         )
-        setupBubble(bubble)
-        bubblesList.add(bubble)
-        activeBubble = bubble
 
-        CoroutineScope(Dispatchers.IO).launch {
-            bubbleDao.insert(bubble)
+        try {
+
+            // 1. Insertar en la BD y esperar confirmacion
+            val insertedId =
+                withContext(Dispatchers.IO) { // ejecuta el bloque en un hilo de fondo y espera a que termine
+                    bubbleDao.insert(bubble)  // Solo si la inserción es exitosa continúa con las operaciones en el hilo principal
+                }
+            // hay que actualizar el id de la burbuja, segun lo generado por la BD
+            bubble.id = insertedId
+
+            // 2. Si llega aca, la insercion fue exitosa
+            bubblesList.add(bubble)
+            setupBubble(bubble)
+        } catch (e: Exception) {
+            Log.e("BubbleService", "Error creando burbuja", e)
+            Toast.makeText(
+                this@BubbleService,
+                "Error al crear la burbuja: ${e.localizedMessage}",
+                Toast.LENGTH_LONG
+            ).show()
         }
+
     }
 
     private fun setupBubble(bubble: Bubble) {
@@ -176,7 +196,6 @@ class BubbleService : Service() {
             }
         )
         bubbleView.setupBubble()
-        bubblesList.add(bubble)
         bubbleViewList.add(bubbleView)
     }
 
@@ -184,10 +203,25 @@ class BubbleService : Service() {
         activeBubble = bubblesList.find { it.id == bubbleId }
     }
 
+    // abre el panel de control y centra la burbuja
     private fun onBubbleDoubleTap(bubbleId: Long) {
         activeBubble = bubblesList.find { it.id == bubbleId }
 
-        activeBubble?.let { bubbleControlPanelView.show(it) }
+        val currentBubble = activeBubble ?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "Error al seleccionar la burbuja", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // lo necesito para poder centrar la burbuja
+        val panelHeight = bubbleControlPanelView.show(currentBubble)
+        val bubbleView = bubbleViewList.find { it.getBubbleId() == currentBubble.id }?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "Error al seleccionar la burbuja", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        bubbleView.centerView(panelHeight)
     }
 
     private fun setupBubbleControlPanel() {
@@ -204,7 +238,9 @@ class BubbleService : Service() {
             onResizeBubble = { sizeDp ->
                 onResizeBubble(sizeDp)
             },
-            onChangeImage = {  },
+            onChangeImage = { bubbleId ->
+                onChangeImage(bubbleId)
+            },
             onRemoveBubble = {  },
             onAddBubble = {  },
             onCloseApp = {  }
@@ -213,42 +249,167 @@ class BubbleService : Service() {
     }
 
     private fun onRenameBubble(newTitle: String) {
-        activeBubble!!.title = newTitle
+        val currentBubble = activeBubble ?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "No hay burbuja seleccionada", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            bubbleDao.update(activeBubble!!)
+        val oldTitle = currentBubble.title
+
+        currentBubble.title = newTitle
+
+        coroutineScope.launch { // usa el scope del servicio
+            try {
+                withContext(Dispatchers.IO) {
+                    bubbleDao.update(currentBubble)
+                }
+            } catch (e: Exception) {
+                currentBubble.title = oldTitle
+                Log.e("BubbleService", "Error actualizando burbuja", e)
+                Toast.makeText(
+                    this@BubbleService,
+                    "Error al guardar cambios",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
-    private fun onChangeShape(isCircle: Boolean) {
-        activeBubble!!.isCircle = isCircle
+    private fun onChangeShape(newShape: BubbleShape) {
+        val currentBubble = activeBubble ?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "No hay burbuja seleccionada", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val oldShape = currentBubble.shape
 
-        bubbleViewList.find { it.getBubbleId() == activeBubble!!.id }!!.changeShape()
+        currentBubble.shape = newShape
 
-        CoroutineScope(Dispatchers.IO).launch {
-            bubbleDao.update(activeBubble!!)
+        coroutineScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    bubbleDao.update(currentBubble)
+                }
+
+                bubbleViewList.find { it.getBubbleId() == currentBubble.id }!!.changeShape()
+            } catch (e: Exception) {
+                currentBubble.shape = oldShape
+                Log.e("BubbleService", "Error actualizando burbuja", e)
+                Toast.makeText(
+                    this@BubbleService,
+                    "Error al guardar cambios",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
     private fun onResizeBubble(sizeDp: Int) {
-        // como la view no se guarda en la BD, solo lo paso a BubbleView
-        bubbleView
+        val currentBubble = activeBubble ?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "No hay burbuja seleccionada", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        bubbleViewList.find { it.getBubbleId() == currentBubble.id }!!.resizeBubble(sizeDp)
     }
 
-    // todo: revisar
+    private fun onChangeImage(bubbleId: Long) {
+        activeBubble = bubblesList.find { it.id == bubbleId } ?: run {
+            // deberia ser imposible que esto pase, pero por las duadas
+            Toast.makeText(this, "No hay burbuja seleccionada", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Problema: Los servicios no pueden usar registerForActivityResult directamente.
+        // Solución: Crea una actividad transparente que actúe como intermediaria.
+        // Iniciar actividad para selección de imagen
+        //openImagePicker()
+
+        val intent = Intent(this, ImageResultHandlerActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    // Abre la actividad para seleccionar imagen
+    private fun openImagePicker() {
+        val intent = Intent(Intent.ACTION_PICK).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/jpeg", "image/png"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.getParcelableExtra<Uri>("selected_image_uri")?.let { uri ->
+            handleNewImage(uri)
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun handleNewImage(uri: Uri) {
+        activeBubble?.let { bubble ->
+
+            // Actualizar y guardar
+            bubble.imageUri = uri
+
+            coroutineScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        bubbleDao.update(bubble)
+                    }
+                    // Actualizar la vista
+                    updateBubbleViewImage(bubble.id)
+                } catch (e: Exception) {
+                    Log.e("BubbleService", "Error actualizando imagen", e)
+                    Toast.makeText(
+                        this@BubbleService,
+                        "Error al guardar imagen",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun updateBubbleViewImage(bubbleId: Long) {
+        bubbleViewList.find { it.getBubbleId() == bubbleId }?.updateImage()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        coroutineScope.cancel() // Cancelar todas las corrutinas
-        // Limpiar todas las vistas
+        // 1. Limpiar todas las vistas de burbujas
         cleanUpBubbles()
+
+        // 2. Limpiar panel de control
+        cleanUpControlPanel()
+
+        // 3. Cancelar todas las corrutinas
+        coroutineScope.cancel()
+
+        // 4. Liberar otras referencias
+        bubblesList.clear()
+        bubbleViewList.clear()
     }
-    // todo: revisar
+
     private fun cleanUpBubbles() {
-        val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        coroutineScope.launch(Dispatchers.IO) {
-            bubbleDao.getAllBubbles().forEach { bubble ->
-                bubble.view?.let { windowManager.removeView(it) }
+        // Ejecutar en main thread (las operaciones de UI deben hacerse aquí)
+        CoroutineScope(Dispatchers.Main).launch {
+            bubbleViewList.forEach { bubbleView ->
+                bubbleView.cleanUp()
             }
+        }
+    }
+
+    private fun cleanUpControlPanel() {
+        // Ejecutar en main thread
+        CoroutineScope(Dispatchers.Main).launch {
+            bubbleControlPanelView.cleanUp()
         }
     }
 

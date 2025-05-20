@@ -8,18 +8,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.*
+import androidx.core.view.ViewCompat
 import com.alq.bubbleoverlay.R
 import com.alq.bubbleoverlay.dao.Bubble
-import com.alq.bubbleoverlay.utils.dpToPx
+import com.alq.bubbleoverlay.dao.BubbleShape
 
 class BubbleControlPanelView(
     private val context: Context,
     private val windowManager: WindowManager,
 
     private val onRenameBubble: (newName: String) -> Unit,
-    private val onChangeShape: (isCircle: Boolean) -> Unit,
+    private val onChangeShape: (newShape: BubbleShape) -> Unit,
     private val onResizeBubble: (sizeDp: Int) -> Unit,
-    private val onChangeImage: (bubble: Bubble) -> Unit,
+    private val onChangeImage: (bubbleId: Long) -> Unit,
     private val onRemoveBubble: (bubble: Bubble) -> Unit,
     private val onAddBubble: () -> Unit,
     private val onCloseApp: () -> Unit
@@ -65,12 +66,12 @@ class BubbleControlPanelView(
 
         // Botón forma circular
         panelView.findViewById<Button>(R.id.btn_circle).setOnClickListener {
-            onChangeShape(true)
+            onChangeShape(BubbleShape.CIRCLE)
         }
 
         // Botón forma cuadrada
         panelView.findViewById<Button>(R.id.btn_square).setOnClickListener {
-            onChangeShape(false)
+            onChangeShape(BubbleShape.SQUARE)
         }
 
         // cambiar tamaño
@@ -83,8 +84,10 @@ class BubbleControlPanelView(
             override fun onStopTrackingTouch(seekBar: SeekBar) {}
         })
 
-        panelView?.findViewById<Button>(R.id.btn_change_image)?.setOnClickListener {
-            activeBubble?.let { onChangeImage(it) }
+        panelView.findViewById<Button>(R.id.btn_change_image)?.setOnClickListener {
+            hide()
+
+            onChangeImage(activeBubble.id)
         }
 
         panelView?.findViewById<Button>(R.id.btn_remove_bubble)?.setOnClickListener {
@@ -100,6 +103,20 @@ class BubbleControlPanelView(
         }
 
     }
+
+    private fun hide() {
+        panelView.visibility = View.GONE
+    }
+
+    fun show(bubble: Bubble): Int {
+        activeBubble = bubble
+
+        panelView.visibility = View.VISIBLE
+        panelView.animate().alpha(0.9f).duration = 200
+
+        return panelView.findViewById<View>(R.id.panel_content).height
+    }
+
 
     private fun renameBubble() {
         val editText = EditText(context).apply {
@@ -124,31 +141,11 @@ class BubbleControlPanelView(
             .show()
     }
 
-    fun show(bubble: Bubble) {
-        activeBubble = bubble
 
-        panelView.visibility = View.VISIBLE
-        panelView.animate().alpha(0.9f).duration = 200
-
-        panelView.post {
-            activeBubble.let { bubble ->
-                val panelHeight = panelView.findViewById<View>(R.id.panel_content).height
-                val displayMetrics = context.resources.displayMetrics
-
-                // Centrado horizontal
-                val screenCenterX = displayMetrics.widthPixels / 2
-                val bubbleHalfWidth = bubble.view!!.width / 2
-                bubble.params!!.x = screenCenterX - bubbleHalfWidth
-
-                // Posición vertical debajo del panel
-                bubble.params!!.y = panelHeight + 40.dpToPx(context)
-
-                windowManager.updateViewLayout(bubble.view, bubble.params)
-            }
+    fun cleanUp() {
+        // 1. Remover vista si está visible
+        if (ViewCompat.isAttachedToWindow(panelView)) {
+            windowManager.removeView(panelView)
         }
-    }
-
-    private fun hide() {
-        panelView.visibility = View.GONE
     }
 }
