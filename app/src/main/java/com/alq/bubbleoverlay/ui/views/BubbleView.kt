@@ -2,6 +2,7 @@ package com.alq.bubbleoverlay.ui.views
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -36,6 +37,7 @@ class BubbleView (
     }
 
     fun setupBubble() {
+        Log.e("BubbleView | setupBubble", "setupBubble: -windowManager- $windowManager")
         // Contexto con tema personalizado
         val themedContext = ContextThemeWrapper(context, R.style.Theme_BubbleOverlay)
         // Infla el layout de la burbuja
@@ -45,13 +47,24 @@ class BubbleView (
         view!!.findViewById<ImageView>(R.id.bubble_icon).setImageURI(bubble.imageUri)
 
         val cardView = view!!.findViewById<MaterialCardView>(R.id.bubble_root)
-        cardView.radius = if (bubble.shape == BubbleShape.CIRCLE) cardView.width / 2f else 0f
+// cardView.radius = if (bubble.shape == BubbleShape.CIRCLE) cardView.width / 2f else 0f
+
+        // Calcular radio usando el tamaño definido en el XML (60dp)
+        val radiusPx = if (bubble.shape == BubbleShape.CIRCLE) {
+            30.dpToPx(context).toFloat() // 30dp = mitad de 60dp (ancho definido en XML)
+        } else {
+            0f
+        }
+        cardView.radius = radiusPx
+
+        windowManager.addView(view, params)
+
+        if (!bubble.isVisible) {
+            hide()
+        }
 
         windowManager.updateViewLayout(view, params)
 
-        if (bubble.isVisible) {
-            windowManager.addView(view, params)
-        }
         // Configura eventos táctiles
         val touchListener = BubbleTouchListener(
             context           = context,
@@ -84,8 +97,21 @@ class BubbleView (
         }
     }
 
-    fun centerView(panelHeight: Int) {
+    fun hide() {
+        view!!.visibility = View.GONE
+    }
+
+    fun show() {
+        view!!.visibility = View.VISIBLE
+    }
+
+    fun centerUnderPanelView(panelHeight: Int) {
+        Log.e("BubbleView", "BubbleView: centerView - panelHeight: $panelHeight")
         val displayMetrics = context.resources.displayMetrics
+
+        // la primera vez que se llama panelHeight es 0
+        var panelHeightAux = panelHeight
+        if (panelHeightAux == 0) { panelHeightAux = 880 }
 
         // Centrado horizontal
         val screenCenterX = displayMetrics.widthPixels / 2
@@ -93,7 +119,8 @@ class BubbleView (
         params!!.x = screenCenterX - bubbleHalfWidth
 
         // Posición vertical debajo del panel
-        params!!.y = panelHeight + 40.dpToPx(context)
+        params!!.y = panelHeightAux + 40.dpToPx(context)
+
         windowManager.updateViewLayout(view, params)
     }
 
@@ -116,6 +143,7 @@ class BubbleView (
             // (por el apply que usa bubble.view como parametro)
             layoutParams.width = sizeInPx
             layoutParams.height = sizeInPx
+            requestLayout() // <- Fuerza el redibujado
         }
     }
 

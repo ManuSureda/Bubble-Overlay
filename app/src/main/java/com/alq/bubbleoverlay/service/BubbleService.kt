@@ -97,21 +97,25 @@ class BubbleService : Service() {
 
 
         coroutineScope.launch {
-            // Cargar burbujas registradas en la BD
+            // 1) Cargar burbujas registradas en la BD
+            // 2) asignar el resultado a bubblesList
+            Log.e("BubbleService | onCreate", "bubblesList previo a loadBubbles $bubblesList")
             bubblesList = loadBubbles()
+            Log.e("BubbleService | onCreate", "bubblesList pos loadBubbles $bubblesList")
 
+            // 3) verificar si hay al menos una burbuja
             if (bubblesList.isEmpty()) { // si no habia ninguna burbuja, crea una
                 createNewBubble()
-            }
-
-            activeBubble = bubblesList[0]
-
-            withContext(Dispatchers.Main) {
+            } else {
+                // 5) crep la BubbleView de cada Bubble
                 // infla el layout y genera el BubbleView
                 bubblesList.forEach { bubble -> setupBubble(bubble) }
-
-                setupBubbleControlPanel()
             }
+            // 4) creo que es in-necesario
+            activeBubble = bubblesList[0]
+
+            // 6) creo la view del panel de control
+            setupBubbleControlPanel()
         }
     }
 
@@ -132,6 +136,7 @@ class BubbleService : Service() {
     }
 
     private suspend fun loadBubbles(): MutableList<Bubble> {
+        Log.e("BubbleService | loadBubbles", "loadBubbles: start -----------------------")
         return try {
             // Este bloque BLOCKEA solo la corrutina hasta que termine la lectura
             withContext(Dispatchers.IO) {
@@ -139,9 +144,8 @@ class BubbleService : Service() {
             }
         } catch (e: Exception) {
             Log.e("BubbleService", "Error cargando burbujas", e)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(this@BubbleService, "Error cargando burbujas", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(this@BubbleService, "Error cargando burbujas", Toast.LENGTH_SHORT).show()
+
             mutableListOf()
         }
     }
@@ -152,6 +156,7 @@ class BubbleService : Service() {
     }
 
     private suspend fun createNewBubble() {
+        Log.e("BubbleService | createNewBubble", "-----------------------")
         val uri = getDefaultImageUri(this)
         val bubble = Bubble(
             title = "Burbuja Nueva",
@@ -159,14 +164,14 @@ class BubbleService : Service() {
         )
 
         try {
+            Log.e("BubbleService | createNewBubble", "bubble pre insert $bubble")
 
             // 1. Insertar en la BD y esperar confirmacion
-            val insertedId =
-                withContext(Dispatchers.IO) { // ejecuta el bloque en un hilo de fondo y espera a que termine
-                    bubbleDao.insert(bubble)  // Solo si la inserción es exitosa continúa con las operaciones en el hilo principal
-                }
-            // hay que actualizar el id de la burbuja, segun lo generado por la BD
-            bubble.id = insertedId
+            withContext(Dispatchers.IO) { // ejecuta el bloque en un hilo de fondo y espera a que termine
+                bubbleDao.insert(bubble)  // Solo si la inserción es exitosa continúa con las operaciones en el hilo principal
+            }
+
+            Log.e("BubbleService | createNewBubble", "bubble pos insert $bubble")
 
             // 2. Si llega aca, la insercion fue exitosa
             bubblesList.add(bubble)
@@ -183,6 +188,8 @@ class BubbleService : Service() {
     }
 
     private fun setupBubble(bubble: Bubble) {
+        Log.e("BubbleService | setupBubble", "------------------------------")
+        Log.e("BubbleService | setupBubble", "setupBubble: -windowManager- $windowManager")
 
         val bubbleView = BubbleView(
             this,
@@ -214,17 +221,19 @@ class BubbleService : Service() {
         }
 
         // lo necesito para poder centrar la burbuja
-        val panelHeight = bubbleControlPanelView.show(currentBubble)
+        val panelHeight = bubbleControlPanelView.getPanelHeight()
         val bubbleView = bubbleViewList.find { it.getBubbleId() == currentBubble.id }?: run {
             // deberia ser imposible que esto pase, pero por las duadas
             Toast.makeText(this, "Error al seleccionar la burbuja", Toast.LENGTH_SHORT).show()
             return
         }
+        bubbleView.centerUnderPanelView(panelHeight)
 
-        bubbleView.centerView(panelHeight)
+        bubbleControlPanelView.show(currentBubble)
     }
 
     private fun setupBubbleControlPanel() {
+        Log.e("BubbleService | setupBubbleControlPanel", "------------------------------")
         bubbleControlPanelView = BubbleControlPanelView(
             this,
             windowManager,

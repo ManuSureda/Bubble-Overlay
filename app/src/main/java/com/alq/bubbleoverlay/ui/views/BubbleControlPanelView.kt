@@ -36,7 +36,7 @@ class BubbleControlPanelView(
 
         setupBubbleControlPanelControls()
 
-        panelView.visibility = View.GONE // Inicialmente oculto
+        hide() // Inicialmente oculto
     }
 
     private fun setupBubbleControlPanelParams() : WindowManager.LayoutParams {
@@ -108,15 +108,16 @@ class BubbleControlPanelView(
         panelView.visibility = View.GONE
     }
 
-    fun show(bubble: Bubble): Int {
+    fun show(bubble: Bubble) {
         activeBubble = bubble
 
         panelView.visibility = View.VISIBLE
         panelView.animate().alpha(0.9f).duration = 200
-
-        return panelView.findViewById<View>(R.id.panel_content).height
     }
 
+    fun getPanelHeight(): Int {
+        return panelView.findViewById<View>(R.id.panel_content).height
+    }
 
     private fun renameBubble() {
         val editText = EditText(context).apply {
@@ -140,7 +141,6 @@ class BubbleControlPanelView(
             }
             .show()
     }
-
 
     fun cleanUp() {
         // 1. Remover vista si está visible
