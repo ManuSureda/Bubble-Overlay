@@ -95,7 +95,6 @@ class BubbleService : Service() {
         // Configura la notificación permanente (requerido para servicios en primer plano)
         setupNotification()
 
-
         coroutineScope.launch {
             // 1) Cargar burbujas registradas en la BD
             // 2) asignar el resultado a bubblesList

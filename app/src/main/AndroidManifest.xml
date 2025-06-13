@@ -77,8 +77,8 @@ a definir este permiso-->
 <!--actividad secundaria para manejar la seleccion de imagenes-->
         <activity
             android:name=".service.ImageResultHandlerActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:exported="true"/>
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:exported="false" />
 
 
         <service
